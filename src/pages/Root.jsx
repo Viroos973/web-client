@@ -118,16 +118,15 @@ const Root = () => {
         const handler = (changes, source) => {
             if (source !== "edit") return
 
+            rowAndCol.map((item) => {
+                if (item.col == null || item.row == null) return
+
+                const filteredElements = findCell(item.col, item.row)
+                filteredElements.classList.add('cell-with-custom-border')
+            })
+
             if (!editUser) {
                 editUser = true
-
-                rowAndCol.map((item) => {
-                    if (item.col == null || item.row == null) return
-
-                    const filteredElements = findCell(item.col, item.row)
-                    filteredElements.classList.add('cell-with-custom-border')
-                })
-
                 return
             }
 
