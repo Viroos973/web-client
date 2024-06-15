@@ -35,7 +35,11 @@ const Root = () => {
     let rowAndCol = null
 
     useEffect(() => {
-        const s = io("http://localhost:3001")
+        const s = io("http://localhost:3001", {
+            extraHeaders: {
+                "x-auth-token": localStorage.getItem("x-auth-token")
+            }
+        })
         setSocket(s)
 
         setDataTable([
