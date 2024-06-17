@@ -1,15 +1,15 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter} from 'react-router-dom';
 import {ROUTES} from "./const/route.js";
 import Root from "./pages/Root"
-import { v4 as uuidV4 } from "uuid"
+import Tables from "./pages/Tables.jsx";
 
 export const router = createBrowserRouter([
     {
         path: ROUTES.ROOT,
-        element: <Navigate to={`/documents/${uuidV4()}`} replace/>
+        element: <Root />
     },
     {
         path: ROUTES.TABLES,
-        element: <Root />
+        element: <Tables />
     }
 ])
