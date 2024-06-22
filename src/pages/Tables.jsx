@@ -32,6 +32,9 @@ const Tables = () => {
     const [dataTable, setDataTable] = useState(["Loading..."])
     const [users, setUsers] = useState(null)
     const [userId, setUserId] = useState(null)
+    const [tableName, setTableName] = useState(null)
+    const [room, setRoom] = useState(null)
+    const [update, setUpdate] = useState(false)
 
     let editUser = true
     let rowAndCol = null
@@ -39,7 +42,8 @@ const Tables = () => {
     useEffect(() => {
         const s = io("http://localhost:3001", {
             extraHeaders: {
-                "x-auth-token": localStorage.getItem("x-auth-token")
+                "x-auth-token": localStorage.getItem("x-auth-token"),
+                "Authorization": localStorage.getItem("x-auth-token")
             }
         })
         setSocket(s)
@@ -66,22 +70,39 @@ const Tables = () => {
         ])
         setUserId(1)
 
-        const getAllTables = async () => {
-            const tables = await axios.get(`http://localhost:5000/rooms/getTables?roomId=${roomId}`)
-            setAllTables(tables.data)
-        }
-
-        getAllTables()
-
         return () => {
             s.disconnect()
         }
     }, [])
 
     useEffect(() => {
+        async function fetchData() {
+            try {
+                const roomResponse = await axios.get(`http://localhost:5000/rooms/getRoom?roomId=${roomId}`, {
+                    headers: {
+                        "Authorization": "Bearer " + localStorage.getItem("x-auth-token")
+                    }
+                });
+                setRoom(roomResponse.data);
+
+                const tablesResponse = await axios.get(`http://localhost:5000/rooms/getTables?roomId=${roomId}`, {
+                    headers: {
+                        "Authorization": "Bearer " + localStorage.getItem("x-auth-token")
+                    }
+                });
+                setAllTables(tablesResponse.data.tables);
+            } catch (error) {
+                console.error("Error fetching data:", error);
+            }
+        }
+
+        fetchData();
+    }, [update])
+
+    useEffect(() => {
         if (socket == null || table == null || dataTable[0] === "Loading..." || users == null || userId == null) return
 
-        socket.once("load-document", (tableExist, data, columns) => {
+        socket.once("load-document", (tableExist, data, columns, name) => {
             if (!tableExist) return
 
             if (data === null) {
@@ -90,6 +111,8 @@ const Tables = () => {
                 table.loadData(data)
                 myColumns = columns
             }
+
+            setTableName(name)
 
             table.updateSettings({
                 columns: myColumns
@@ -258,14 +281,38 @@ const Tables = () => {
 
     const addTable = async () => {
         const name = document.getElementById('333').value
-        await axios.post(`http://localhost:5000/tables/addTable?roomId=${roomId}`, {name: name})
+        await axios.post(`http://localhost:5000/tables/addTable?roomId=${roomId}`, {name: name}, {
+            headers: {
+                "Authorization": "Bearer " + localStorage.getItem("x-auth-token")
+            }
+        })
             .then(table => {
                 window.location.pathname = `/room/${roomId}/table/${table.data.tableId}`
             })
     }
 
-    const navigateTo = (event) => {
-        window.location.href = event.target.value;
+    const renameTable = async () => {
+        const name = document.getElementById('1').value
+        await axios.put(`http://localhost:5000/tables/renameTable?tableId=${tableId}`, {name: name}, {
+            headers: {
+                "Authorization": "Bearer " + localStorage.getItem("x-auth-token")
+            }
+        })
+            .then(() => {
+                setTableName(name)
+            })
+    }
+
+    const renameRoom = async () => {
+        const name = document.getElementById('22').value
+        await axios.put(`http://localhost:5000/rooms/renameRoom?roomId=${roomId}`, {name: name}, {
+            headers: {
+                "Authorization": "Bearer " + localStorage.getItem("x-auth-token")
+            }
+        })
+            .then(() => {
+                setUpdate(prev => !prev)
+            })
     }
 
     const wrapperRef = useCallback(wrapper => {
@@ -289,14 +336,22 @@ const Tables = () => {
     }, [])
     return (
         <>
+            <h1>Room name: {room == null ? "" : room.name}</h1>
+            <h3>Table name: {tableName}</h3>
             <div className="container" ref={wrapperRef}/>
             <button onClick={addColumn}>Add Column</button>
-            <input type={'text'} id={'999999999'}/>
+            <input type={'text'} id={'999999999'}/><br/>
             <button onClick={addTable}>Add Table</button>
-            <input type={'text'} id={'333'}/>
-            <select name="cars" id="cars" onChange={navigateTo} value={tableId}>
-                {allTables != null ? allTables.tables.map((item) => (<option value={item.id} key={item.id}>{item.name}</option>)) : ""}
-            </select>
+            <input type={'text'} id={'333'}/><br/>
+            <ul id="cars">
+                {allTables != null ? allTables.map((item) => (
+                    <li key={item.id}><a href={item.id}>{item.name}</a></li>
+                        )) : ""}
+            </ul><br/>
+            <button onClick={renameTable}>Rename Table</button>
+            <input type={'text'} id={'1'}/><br/>
+            <button onClick={renameRoom}>Rename Room</button>
+            <input type={'text'} id={'22'}/><br/>
         </>
     )
 }
