@@ -40,7 +40,7 @@ const Tables = () => {
     let rowAndCol = null
 
     useEffect(() => {
-        const s = io("http://localhost:3001", {
+        const s = io("http://158.160.147.53:6969", {
             extraHeaders: {
                 "x-auth-token": localStorage.getItem("x-auth-token"),
                 "Authorization": localStorage.getItem("x-auth-token")
@@ -78,14 +78,14 @@ const Tables = () => {
     useEffect(() => {
         async function fetchData() {
             try {
-                const roomResponse = await axios.get(`http://localhost:5000/rooms/getRoom?roomId=${roomId}`, {
+                const roomResponse = await axios.get(`http://158.160.147.53:6868/rooms/getRoom?roomId=${roomId}`, {
                     headers: {
                         "Authorization": "Bearer " + localStorage.getItem("x-auth-token")
                     }
                 });
                 setRoom(roomResponse.data);
 
-                const tablesResponse = await axios.get(`http://localhost:5000/rooms/getTables?roomId=${roomId}`, {
+                const tablesResponse = await axios.get(`http://158.160.147.53:6868/rooms/getTables?roomId=${roomId}`, {
                     headers: {
                         "Authorization": "Bearer " + localStorage.getItem("x-auth-token")
                     }
@@ -281,7 +281,7 @@ const Tables = () => {
 
     const addTable = async () => {
         const name = document.getElementById('333').value
-        await axios.post(`http://localhost:5000/tables/addTable?roomId=${roomId}`, {name: name}, {
+        await axios.post(`http://158.160.147.53:6868/tables/addTable?roomId=${roomId}`, {name: name}, {
             headers: {
                 "Authorization": "Bearer " + localStorage.getItem("x-auth-token")
             }
@@ -293,7 +293,7 @@ const Tables = () => {
 
     const renameTable = async () => {
         const name = document.getElementById('1').value
-        await axios.put(`http://localhost:5000/tables/renameTable?tableId=${tableId}`, {name: name}, {
+        await axios.put(`http://158.160.147.53:6868/tables/renameTable?tableId=${tableId}`, {name: name}, {
             headers: {
                 "Authorization": "Bearer " + localStorage.getItem("x-auth-token")
             }
@@ -305,7 +305,7 @@ const Tables = () => {
 
     const renameRoom = async () => {
         const name = document.getElementById('22').value
-        await axios.put(`http://localhost:5000/rooms/renameRoom?roomId=${roomId}`, {name: name}, {
+        await axios.put(`http://158.160.147.53:6868/rooms/renameRoom?roomId=${roomId}`, {name: name}, {
             headers: {
                 "Authorization": "Bearer " + localStorage.getItem("x-auth-token")
             }

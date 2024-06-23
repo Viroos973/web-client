@@ -7,7 +7,7 @@ const Root = () => {
 
     useEffect(() => {
         const getAllRooms = async () => {
-            const rooms = await axios.get(`http://localhost:5000/rooms/getUserRooms`, {
+            const rooms = await axios.get(`http://158.160.147.53:6868/rooms/getUserRooms`, {
                 headers: {
                     "Authorization": "Bearer " + localStorage.getItem("x-auth-token")
                 }
@@ -20,7 +20,7 @@ const Root = () => {
 
     const addRoom = async() => {
         const name = document.getElementById('7777777').value
-        await axios.post("http://localhost:5000/rooms/addRoom", {name: name}, {
+        await axios.post("http://158.160.147.53:6868/rooms/addRoom", {name: name}, {
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem("x-auth-token")}`
             }
@@ -33,7 +33,7 @@ const Root = () => {
 
     const joinRoom = async() => {
         const code = document.getElementById('55555').value
-        await axios.post("http://localhost:5000/rooms/inviteUser", {invitation_code: code}, {
+        await axios.post("http://158.160.147.53:6868/rooms/inviteUser", {invitation_code: code}, {
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem("x-auth-token")}`
             }
