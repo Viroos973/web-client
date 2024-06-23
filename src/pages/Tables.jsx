@@ -14,6 +14,20 @@ let myColumns = [
     }
 ]
 
+const parseJWT = (token) => {
+    if (token == null) return null
+
+    const base64Url = token.split(".")[1]
+
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+    }).join(''));
+
+    return JSON.parse(jsonPayload)
+}
+
 const findCell = (col, row) => {
     const elementsInRange = document.querySelectorAll(`[aria-colindex="${col + 2}"]`)
 
@@ -34,10 +48,10 @@ const Tables = () => {
     const [userId, setUserId] = useState(null)
     const [tableName, setTableName] = useState(null)
     const [room, setRoom] = useState(null)
-    const [update, setUpdate] = useState(false)
+    const [updateTables, setUpdateTables] = useState(false)
+    const [rowAndCol, setRowAndCol] = useState([]);
 
     let editUser = true
-    let rowAndCol = null
 
     useEffect(() => {
         const s = io("http://158.160.147.53:6969", {
@@ -61,14 +75,30 @@ const Tables = () => {
             "I'm a bird",
             "I'm a animal"
         ])
-        setUsers([
-            {id: 1},
-            {id: 2},
-            {id: 3},
-            {id: 4},
-            {id: 5}
-        ])
-        setUserId(1)
+
+        const getRoomUsers = async () => {
+            const roomResponse = await axios.get(`http://158.160.147.53:6868/rooms/getUsers?roomId=${roomId}`, {
+                headers: {
+                    "Authorization": "Bearer " + localStorage.getItem("x-auth-token")
+                }
+            })
+            setUsers(roomResponse.data.users)
+        }
+
+        const jsonToken = parseJWT(localStorage.getItem("x-auth-token"))
+        setUserId(jsonToken == null ? null : jsonToken.userId)
+
+        const getRoom = async () => {
+            const roomResponse = await axios.get(`http://158.160.147.53:6868/rooms/getRoom?roomId=${roomId}`, {
+                headers: {
+                    "Authorization": "Bearer " + localStorage.getItem("x-auth-token")
+                }
+            })
+            setRoom(roomResponse.data)
+        }
+
+        getRoom()
+        getRoomUsers()
 
         return () => {
             s.disconnect()
@@ -77,27 +107,16 @@ const Tables = () => {
 
     useEffect(() => {
         async function fetchData() {
-            try {
-                const roomResponse = await axios.get(`http://158.160.147.53:6868/rooms/getRoom?roomId=${roomId}`, {
-                    headers: {
-                        "Authorization": "Bearer " + localStorage.getItem("x-auth-token")
-                    }
-                });
-                setRoom(roomResponse.data);
-
-                const tablesResponse = await axios.get(`http://158.160.147.53:6868/rooms/getTables?roomId=${roomId}`, {
-                    headers: {
-                        "Authorization": "Bearer " + localStorage.getItem("x-auth-token")
-                    }
-                });
-                setAllTables(tablesResponse.data.tables);
-            } catch (error) {
-                console.error("Error fetching data:", error);
-            }
+            const tablesResponse = await axios.get(`http://158.160.147.53:6868/rooms/getTables?roomId=${roomId}`, {
+                headers: {
+                    "Authorization": "Bearer " + localStorage.getItem("x-auth-token")
+                }
+            });
+            setAllTables(tablesResponse.data.tables);
         }
 
         fetchData();
-    }, [update])
+    }, [updateTables])
 
     useEffect(() => {
         if (socket == null || table == null || dataTable[0] === "Loading..." || users == null || userId == null) return
@@ -118,7 +137,8 @@ const Tables = () => {
                 columns: myColumns
             })
 
-            rowAndCol = users.map((item) => ({id: item.id, row: null, col: null}))
+            const dataRowAndCol = users.map((item) => ({id: item._id, row: null, col: null}))
+            setRowAndCol(dataRowAndCol)
         })
 
         socket.emit("get-document", tableId, roomId)
@@ -141,7 +161,17 @@ const Tables = () => {
 
         const handler = delta => {
             editUser = false
+
+            const activeEditor = table.getActiveEditor()
+            const value = activeEditor == null ? null : activeEditor.getValue()
+            const isOpen = activeEditor == null ? null : activeEditor._opened
+
             table.setDataAtCell(delta[0], delta[1], delta[2])
+
+            if (activeEditor && isOpen) {
+                activeEditor.beginEditing();
+                activeEditor.setValue(value)
+            }
         }
         socket.on("receive-changes", handler)
 
@@ -254,11 +284,20 @@ const Tables = () => {
         if (socket == null || table == null) return
 
         const handler = (cols, title) => {
+            const activeEditor = table.getActiveEditor()
+            const value = activeEditor == null ? null : activeEditor.getValue()
+            const isOpen = activeEditor == null ? null : activeEditor._opened
             myColumns = cols
+
             table.setDataAtCell(0, myColumns.length - 1, title)
             table.updateSettings({
-                columns: myColumns
+                columns: cols
             })
+
+            if (activeEditor && isOpen) {
+                activeEditor.beginEditing();
+                activeEditor.setValue(value)
+            }
         }
         socket.on("receive-cols", handler)
 
@@ -300,6 +339,7 @@ const Tables = () => {
         })
             .then(() => {
                 setTableName(name)
+                setUpdateTables(prev => !prev)
             })
     }
 
@@ -311,7 +351,7 @@ const Tables = () => {
             }
         })
             .then(() => {
-                setUpdate(prev => !prev)
+                setRoom({...room, name: name})
             })
     }
 
@@ -343,7 +383,7 @@ const Tables = () => {
             <input type={'text'} id={'999999999'}/><br/>
             <button onClick={addTable}>Add Table</button>
             <input type={'text'} id={'333'}/><br/>
-            <ul id="cars">
+            <ul>
                 {allTables != null ? allTables.map((item) => (
                     <li key={item.id}><a href={item.id}>{item.name}</a></li>
                         )) : ""}
@@ -352,6 +392,11 @@ const Tables = () => {
             <input type={'text'} id={'1'}/><br/>
             <button onClick={renameRoom}>Rename Room</button>
             <input type={'text'} id={'22'}/><br/>
+            <ul>
+                {users != null ? users.map((item) => (
+                    <li key={item._id}>{item.username}</li>
+                )) : ""}
+            </ul><br/>
         </>
     )
 }
