@@ -1,18 +1,18 @@
-import { useCallback, useEffect, useState } from "react"
-import { io } from "socket.io-client"
-import { useParams } from "react-router-dom"
+import {useCallback, useEffect, useState} from "react"
+import {io} from "socket.io-client"
+import {useParams} from "react-router-dom"
 import Handsontable from 'handsontable';
 import 'handsontable/dist/handsontable.full.min.css';
 import axios from "axios";
 
-const SAVE_INTERVAL_MS = 2000
-
+let editUser = true
 let myColumns = [
     {
         data: '0',
         type: 'text'
     }
 ]
+let myRow = []
 
 const parseJWT = (token) => {
     if (token == null) return null
@@ -40,8 +40,8 @@ const findCell = (col, row) => {
 
 const Tables = () => {
     const { roomId, tableId } = useParams()
-    const [socket, setSocket] = useState()
-    const [table, setTable] = useState()
+    const [socket, setSocket] = useState(null)
+    const [table, setTable] = useState(null)
     const [allTables, setAllTables] = useState(null)
     const [dataTable, setDataTable] = useState(["Loading..."])
     const [users, setUsers] = useState(null)
@@ -49,9 +49,8 @@ const Tables = () => {
     const [tableName, setTableName] = useState(null)
     const [room, setRoom] = useState(null)
     const [updateTables, setUpdateTables] = useState(false)
-    const [rowAndCol, setRowAndCol] = useState([]);
-
-    let editUser = true
+    const [updateUsers, setUpdateUsers] = useState(false)
+    const [rowAndCol, setRowAndCol] = useState(null)
 
     useEffect(() => {
         const s = io("http://158.160.147.53:6969", {
@@ -76,15 +75,6 @@ const Tables = () => {
             "I'm a animal"
         ])
 
-        const getRoomUsers = async () => {
-            const roomResponse = await axios.get(`http://158.160.147.53:6868/rooms/getUsers?roomId=${roomId}`, {
-                headers: {
-                    "Authorization": "Bearer " + localStorage.getItem("x-auth-token")
-                }
-            })
-            setUsers(roomResponse.data.users)
-        }
-
         const jsonToken = parseJWT(localStorage.getItem("x-auth-token"))
         setUserId(jsonToken == null ? null : jsonToken.userId)
 
@@ -98,7 +88,6 @@ const Tables = () => {
         }
 
         getRoom()
-        getRoomUsers()
 
         return () => {
             s.disconnect()
@@ -119,14 +108,29 @@ const Tables = () => {
     }, [updateTables])
 
     useEffect(() => {
+        const getRoomUsers = async () => {
+            const roomResponse = await axios.get(`http://158.160.147.53:6868/rooms/getUsers?roomId=${roomId}`, {
+                headers: {
+                    "Authorization": "Bearer " + localStorage.getItem("x-auth-token")
+                }
+            })
+            setUsers(roomResponse.data.users)
+        }
+
+        getRoomUsers();
+    }, [updateUsers])
+
+    useEffect(() => {
         if (socket == null || table == null || dataTable[0] === "Loading..." || users == null || userId == null) return
 
         socket.once("load-document", (tableExist, data, columns, name) => {
             if (!tableExist) return
 
             if (data === null) {
+                myRow = dataTable.map(items => ({0: items}))
                 table.loadData(dataTable.map(items => ({0: items})))
             } else {
+                myRow = data
                 table.loadData(data)
                 myColumns = columns
             }
@@ -137,24 +141,11 @@ const Tables = () => {
                 columns: myColumns
             })
 
-            const dataRowAndCol = users.map((item) => ({id: item._id, row: null, col: null}))
-            setRowAndCol(dataRowAndCol)
+            setRowAndCol(users.map((item) => ({id: item._id, row: null, col: null})))
         })
 
         socket.emit("get-document", tableId, roomId)
     }, [socket, table, tableId, dataTable, users, userId])
-
-    useEffect(() => {
-        if (socket == null || table == null) return
-
-        const interval = setInterval(() => {
-            socket.emit("save-document", table.getSourceData(), myColumns)
-        }, SAVE_INTERVAL_MS)
-
-        return () => {
-            clearInterval(interval)
-        }
-    }, [socket, table])
 
     useEffect(() => {
         if (socket == null || table == null) return
@@ -181,7 +172,7 @@ const Tables = () => {
     }, [socket, table])
 
     useEffect(() => {
-        if (socket == null || table == null) return
+        if (socket == null || table == null || rowAndCol == null) return
 
         const handler = (changes, source) => {
             if (source !== "edit") return
@@ -199,21 +190,22 @@ const Tables = () => {
             }
 
             socket.emit("send-changes", [changes[0][0], table.propToCol(changes[0][1]), changes[0][3]])
+            socket.emit("save-document", table.getSourceData(), myColumns)
         }
         table.addHook('afterChange', handler)
 
         return () => {
             Handsontable.hooks.remove('afterChange', handler);
         }
-    }, [socket, table])
+    }, [socket, table, rowAndCol])
 
     useEffect(() => {
-        if (socket == null || table == null) return
+        if (socket == null || table == null || rowAndCol == null) return
 
         const handler = (row, col, id) => {
             const otherUser = rowAndCol.find((item) => item.id === id)
 
-            if (otherUser.row !== null && otherUser.col !== null) {
+            if (otherUser != null && otherUser.row != null && otherUser.col != null) {
                 const oldElements = findCell(otherUser.col, otherUser.row)
                 oldElements.classList.remove('cell-with-custom-border')
             }
@@ -229,7 +221,7 @@ const Tables = () => {
         return () => {
             socket.off("set-color", handler)
         }
-    }, [socket, table])
+    }, [socket, table, rowAndCol])
 
     useEffect(() => {
         if (socket == null || table == null) return
@@ -289,7 +281,7 @@ const Tables = () => {
             const isOpen = activeEditor == null ? null : activeEditor._opened
             myColumns = cols
 
-            table.setDataAtCell(0, myColumns.length - 1, title)
+            if (title != null) table.setDataAtCell(0, myColumns.length - 1, title)
             table.updateSettings({
                 columns: cols
             })
@@ -318,6 +310,63 @@ const Tables = () => {
         socket.emit("send-cols", myColumns, title)
     }
 
+    const deleteColumn = () => {
+        myColumns.pop();
+
+        table.updateSettings({
+            columns: myColumns
+        })
+
+        socket.emit("send-cols", myColumns)
+    }
+
+    useEffect(() => {
+        if (socket == null || table == null) return
+
+        const handler = (rows) => {
+            const activeEditor = table.getActiveEditor()
+            const value = activeEditor == null ? null : activeEditor.getValue()
+            const isOpen = activeEditor == null ? null : activeEditor._opened
+            myRow = rows
+
+            table.updateSettings({
+                data: rows
+            })
+
+            if (activeEditor && isOpen) {
+                activeEditor.beginEditing();
+                activeEditor.setValue(value)
+            }
+        }
+        socket.on("receive-rows", handler)
+
+        return () => {
+            socket.off("receive-rows", handler)
+        }
+    }, [socket, table])
+
+    const addRow = () => {
+        myRow.push({});
+
+        table.updateSettings({
+            data: myRow
+        })
+
+        socket.emit("send-rows", myRow)
+        socket.emit("save-document", table.getSourceData(), myColumns)
+    }
+
+    const deleteRow = () => {
+        myRow.pop();
+
+        table.updateSettings({
+            data: myRow
+        })
+
+        socket.emit("send-rows", myRow)
+        socket.emit("save-document", table.getSourceData(), myColumns)
+    }
+
     const addTable = async () => {
         const name = document.getElementById('333').value
         await axios.post(`http://158.160.147.53:6868/tables/addTable?roomId=${roomId}`, {name: name}, {
@@ -326,9 +375,73 @@ const Tables = () => {
             }
         })
             .then(table => {
+                socket.emit("send-tables")
                 window.location.pathname = `/room/${roomId}/table/${table.data.tableId}`
             })
     }
+
+    const deleteTable = async () => {
+        await axios.delete(`http://158.160.147.53:6868/tables/deleteTable?tableId=${tableId}`, {
+            headers: {
+                "Authorization": "Bearer " + localStorage.getItem("x-auth-token")
+            }
+        })
+            .then(() => {
+                socket.emit("send-tables")
+                window.location.pathname = `/room/${roomId}/table/${room.main_table}`
+            })
+    }
+
+    const deleteRoom = async () => {
+        await axios.delete(`http://158.160.147.53:6868/rooms/deleteRoom?roomId=${roomId}`, {
+            headers: {
+                "Authorization": "Bearer " + localStorage.getItem("x-auth-token")
+            }
+        })
+            .then(() => {
+                socket.emit("delete-room")
+                window.location.pathname = `/`
+            })
+    }
+
+    useEffect(() => {
+        if (socket == null || table == null) return
+
+        const handler = () => {
+            window.location.pathname = `/`
+        }
+        socket.on("go-home", handler)
+
+        return () => {
+            socket.off("go-home", handler)
+        }
+    }, [socket, table])
+
+    useEffect(() => {
+        if (socket == null || table == null) return
+
+        const handler = (name) => {
+            setTableName(name)
+        }
+        socket.on("receive-table-name", handler)
+
+        return () => {
+            socket.off("receive-table-name", handler)
+        }
+    }, [socket, table])
+
+    useEffect(() => {
+        if (socket == null || table == null) return
+
+        const handler = () => {
+            setUpdateTables(prev => !prev)
+        }
+        socket.on("receive-tables", handler)
+
+        return () => {
+            socket.off("receive-tables", handler)
+        }
+    }, [socket, table])
 
     const renameTable = async () => {
         const name = document.getElementById('1').value
@@ -340,8 +453,23 @@ const Tables = () => {
             .then(() => {
                 setTableName(name)
                 setUpdateTables(prev => !prev)
+                socket.emit("send-table-name", name)
+                socket.emit("send-tables")
             })
     }
+
+    useEffect(() => {
+        if (socket == null || table == null || room == null) return
+
+        const handler = (name) => {
+            setRoom({...room, name: name})
+        }
+        socket.on("receive-room-name", handler)
+
+        return () => {
+            socket.off("receive-room-name", handler)
+        }
+    }, [socket, table, room])
 
     const renameRoom = async () => {
         const name = document.getElementById('22').value
@@ -352,8 +480,48 @@ const Tables = () => {
         })
             .then(() => {
                 setRoom({...room, name: name})
+                socket.emit("send-room-name", name)
             })
     }
+
+    const addUser = async () => {
+        const email = document.getElementById('123456789').value
+        await axios.post(`http://158.160.147.53:6868/rooms/addUser?roomId=${roomId}`, {email: email}, {
+            headers: {
+                "Authorization": "Bearer " + localStorage.getItem("x-auth-token")
+            }
+        })
+            .then(() => {
+                setUpdateUsers(prev => !prev)
+                socket.emit("send-users")
+            })
+    }
+
+    const deleteUser = async () => {
+        const id = document.getElementById('987654321').value
+        await axios.delete(`http://158.160.147.53:6868/rooms/deleteUserRoom?roomId=${roomId}&user_id=${id}`, {
+            headers: {
+                "Authorization": "Bearer " + localStorage.getItem("x-auth-token")
+            }
+        })
+            .then(() => {
+                setUpdateUsers(prev => !prev)
+                socket.emit("send-users")
+            })
+    }
+
+    useEffect(() => {
+        if (socket == null || table == null) return
+
+        const handler = () => {
+            setUpdateUsers(prev => !prev)
+        }
+        socket.on("receive-users", handler)
+
+        return () => {
+            socket.off("receive-users", handler)
+        }
+    }, [socket, table])
 
     const wrapperRef = useCallback(wrapper => {
         if (wrapper == null) return
@@ -378,11 +546,16 @@ const Tables = () => {
         <>
             <h1>Room name: {room == null ? "" : room.name}</h1>
             <h3>Table name: {tableName}</h3>
+            <button onClick={deleteRoom}>Delete Room</button><br/>
             <div className="container" ref={wrapperRef}/>
+            <button onClick={addRow}>Add Row</button>
             <button onClick={addColumn}>Add Column</button>
-            <input type={'text'} id={'999999999'}/><br/>
+            <input type={'text'} id={'999999999'}/>
+            <button onClick={deleteColumn}>Delete Column</button>
+            <button onClick={deleteRow}>Delete Row</button><br/>
             <button onClick={addTable}>Add Table</button>
-            <input type={'text'} id={'333'}/><br/>
+            <input type={'text'} id={'333'}/>
+            <button onClick={deleteTable}>Delete Table</button><br/>
             <ul>
                 {allTables != null ? allTables.map((item) => (
                     <li key={item.id}><a href={item.id}>{item.name}</a></li>
@@ -397,6 +570,10 @@ const Tables = () => {
                     <li key={item._id}>{item.username}</li>
                 )) : ""}
             </ul><br/>
+            <button onClick={addUser}>Add User</button>
+            <input type={'text'} id={'123456789'}/><br/>
+            <button onClick={deleteUser}>Delete User</button>
+            <input type={'text'} id={'987654321'}/><br/>
         </>
     )
 }
