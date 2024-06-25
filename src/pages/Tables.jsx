@@ -38,12 +38,19 @@ const findCell = (col, row) => {
     return filteredElements[0]
 }
 
+function objectToArray(obj, length) {
+    const arr = new Array(length).fill('');
+    for (const key in obj) {
+        arr[parseInt(key)] = obj[key];
+    }
+    return arr;
+}
+
 const Tables = () => {
     const { roomId, tableId } = useParams()
     const [socket, setSocket] = useState(null)
     const [table, setTable] = useState(null)
     const [allTables, setAllTables] = useState(null)
-    const [dataTable, setDataTable] = useState(["Loading..."])
     const [users, setUsers] = useState(null)
     const [userId, setUserId] = useState(null)
     const [tableName, setTableName] = useState(null)
@@ -51,6 +58,7 @@ const Tables = () => {
     const [updateTables, setUpdateTables] = useState(false)
     const [updateUsers, setUpdateUsers] = useState(false)
     const [rowAndCol, setRowAndCol] = useState(null)
+    const dataTable = ["Loading..."]
 
     useEffect(() => {
         const s = io("http://158.160.147.53:6969", {
@@ -60,20 +68,6 @@ const Tables = () => {
             }
         })
         setSocket(s)
-
-        setDataTable([
-            "English",
-            "I'm a hero",
-            "I'm a villain",
-            "I'm a boy",
-            "I'm a girl",
-            "I'm a man",
-            "I'm a women",
-            "I'm a cat",
-            "I'm a dog",
-            "I'm a bird",
-            "I'm a animal"
-        ])
 
         const jsonToken = parseJWT(localStorage.getItem("x-auth-token"))
         setUserId(jsonToken == null ? null : jsonToken.userId)
@@ -121,19 +115,14 @@ const Tables = () => {
     }, [updateUsers])
 
     useEffect(() => {
-        if (socket == null || table == null || dataTable[0] === "Loading..." || users == null || userId == null) return
+        if (socket == null || table == null || users == null || userId == null) return
 
         socket.once("load-document", (tableExist, data, columns, name) => {
             if (!tableExist) return
 
-            if (data === null) {
-                myRow = dataTable.map(items => ({0: items}))
-                table.loadData(dataTable.map(items => ({0: items})))
-            } else {
-                myRow = data
-                table.loadData(data)
-                myColumns = columns
-            }
+            myRow = data
+            table.loadData(data)
+            myColumns = columns
 
             setTableName(name)
 
@@ -145,7 +134,7 @@ const Tables = () => {
         })
 
         socket.emit("get-document", tableId, roomId)
-    }, [socket, table, tableId, dataTable, users, userId])
+    }, [socket, table, tableId, users, userId])
 
     useEffect(() => {
         if (socket == null || table == null) return
@@ -300,24 +289,41 @@ const Tables = () => {
 
     const addColumn = () => {
         const title = document.getElementById('999999999').value
+
+        myRow = table.getSourceData()
+        myRow = myRow.map((item) => {
+            const arr = objectToArray(item, myColumns.length)
+            arr.splice(arr.length - 1, 0, "")
+            return Object.fromEntries(arr.map((value, index) => [index, value]))
+        })
         myColumns.push({});
 
-        table.setDataAtCell(0, myColumns.length - 1, title)
         table.updateSettings({
+            data: myRow,
             columns: myColumns
         })
+        table.setDataAtCell(0, myColumns.length - 2, title)
 
-        socket.emit("send-cols", myColumns, title)
+        socket.emit("send-cols", myColumns, table.getSourceData(), title)
     }
 
     const deleteColumn = () => {
+        if(myColumns.length <= 2) return
+
+        myRow = table.getSourceData()
+        myRow = myRow.map((item) => {
+            const arr = objectToArray(item, myColumns.length)
+            arr.splice(arr.length - 2, 1)
+            return Object.fromEntries(arr.map((value, index) => [index, value]))
+        })
         myColumns.pop();
 
         table.updateSettings({
+            data: myRow,
             columns: myColumns
         })
 
-        socket.emit("send-cols", myColumns)
+        socket.emit("send-cols", myColumns, table.getSourceData())
     }
 
     useEffect(() => {
@@ -357,6 +363,8 @@ const Tables = () => {
     }
 
     const deleteRow = () => {
+        if (myRow.length <= 1) return
+
         myRow.pop();
 
         table.updateSettings({
@@ -369,7 +377,12 @@ const Tables = () => {
 
     const addTable = async () => {
         const name = document.getElementById('333').value
-        await axios.post(`http://158.160.147.53:6868/tables/addTable?roomId=${roomId}`, {name: name}, {
+        const tables = {
+            fileName: name,
+            data: [table.getSourceData()[0]],
+            columns: myColumns
+        }
+        await axios.post(`http://158.160.147.53:6868/tables/addTable?roomId=${roomId}`, {tableData: tables}, {
             headers: {
                 "Authorization": "Bearer " + localStorage.getItem("x-auth-token")
             }

@@ -2,8 +2,9 @@ import axios from "axios";
 import {useEffect, useState} from "react";
 
 const parseJsonFile = (json) => {
-    return json.map(async (item) => {
+    return json.map((item) => {
         item.columns.unshift(item.labels)
+        if (item.useAttributes) item.columns.push(item.attributes)
 
         const transformedArray = item.columns.reduce((acc, curr, index) => {
             curr.forEach((value, key) => {
@@ -12,20 +13,21 @@ const parseJsonFile = (json) => {
                 }
                 acc[key][index] = value;
             });
-            console.log(acc)
             return acc;
         }, []);
 
         const arr = new Array(item.columns.length).fill({})
 
         return {
-            name: item.fileName.split(".")[0],
+            fileName: item.fileName.split(".")[0],
             version: item.version,
             isBigEndian: item.isBigEndian,
             useIndices: item.useIndices,
             useStyles: item.useStyles,
             useAttributes: item.useAttributes,
+            useAttributeStrings: item.useAttributeStrings,
             bytesPerAttribute: item.bytesPerAttribute,
+            atO1Numbers: item.atO1Numbers,
             encoding: item.encoding,
             attributes: item.attributes,
             data: transformedArray,
@@ -53,7 +55,8 @@ const Root = () => {
 
     const addRoom = async() => {
         const name = document.getElementById('7777777').value
-        const file = document.getElementById('88888888').value
+        const fileInput = document.getElementById('88888888')
+        const file = fileInput.files[0]
         let formData = new FormData();
         formData.append("zipWithMsbts", file);
 
@@ -63,9 +66,9 @@ const Root = () => {
             }
         })
             .then(async (fileStr) => {
-                const tables = parseJsonFile(fileStr)
+                const tables = parseJsonFile(fileStr.data)
 
-                await axios.post("http://158.160.147.53:6868/rooms/addRoom", {name: name, tables: tables[0]}, {
+                await axios.post("http://158.160.147.53:6868/rooms/addRoom", {name: name, tableData: tables[0]}, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem("x-auth-token")}`
                     }
@@ -74,15 +77,17 @@ const Root = () => {
                         setUpdate(prev => !prev)
 
                         tables.shift()
-                        tables.map(async (item) => {
-                            await axios.post(`http://localhost:5000/tables/addTable?roomId=${data.data.roomId}`, item, {
+                        Promise.all(tables.map((item) => {
+                            return axios.post(`http://158.160.147.53:6868/tables/addTable?roomId=${data.data.roomId}`,
+                                { tableData: item }, {
                                 headers: {
                                     'Authorization': `Bearer ${localStorage.getItem("x-auth-token")}`
                                 }
+                            }).then(() => {
+                                console.log("+")
                             })
-                                .then(() => {
-                                    window.location.pathname = `/room/${data.data.roomId}/table/${data.data.tableId}`
-                                })
+                        })).then(() => {
+                            window.location.pathname = `/room/${data.data.roomId}/table/${data.data.tableId}`
                         })
                     })
             })
@@ -105,7 +110,7 @@ const Root = () => {
         <>
             <button onClick={addRoom}>Add Room</button>
             <input type={'text'} id={'7777777'}/>
-            <input type={'file'} id={'88888888'}/><br/>
+            <input type="file" id="88888888" name="file"/><br/>
             <button onClick={joinRoom}>Join Room</button>
             <input type={'text'} id={'55555'}/><br/>
             <ul>
