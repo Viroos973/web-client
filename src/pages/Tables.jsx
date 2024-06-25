@@ -38,14 +38,6 @@ const findCell = (col, row) => {
     return filteredElements[0]
 }
 
-function objectToArray(obj, length) {
-    const arr = new Array(length).fill('');
-    for (const key in obj) {
-        arr[parseInt(key)] = obj[key];
-    }
-    return arr;
-}
-
 const Tables = () => {
     const { roomId, tableId } = useParams()
     const [socket, setSocket] = useState(null)
@@ -264,18 +256,20 @@ const Tables = () => {
     useEffect(() => {
         if (socket == null || table == null) return
 
-        const handler = (cols, title) => {
+        const handler = (cols, data) => {
             const activeEditor = table.getActiveEditor()
             const value = activeEditor == null ? null : activeEditor.getValue()
             const isOpen = activeEditor == null ? null : activeEditor._opened
             myColumns = cols
 
-            if (title != null) table.setDataAtCell(0, myColumns.length - 1, title)
             table.updateSettings({
-                columns: cols
+                columns: cols,
+                data: data
             })
 
             if (activeEditor && isOpen) {
+                if (activeEditor.col === myColumns.length - 2) activeEditor.col = myColumns.length - 1
+
                 activeEditor.beginEditing();
                 activeEditor.setValue(value)
             }
@@ -289,41 +283,14 @@ const Tables = () => {
 
     const addColumn = () => {
         const title = document.getElementById('999999999').value
-
-        myRow = table.getSourceData()
-        myRow = myRow.map((item) => {
-            const arr = objectToArray(item, myColumns.length)
-            arr.splice(arr.length - 1, 0, "")
-            return Object.fromEntries(arr.map((value, index) => [index, value]))
-        })
         myColumns.push({});
-
-        table.updateSettings({
-            data: myRow,
-            columns: myColumns
-        })
-        table.setDataAtCell(0, myColumns.length - 2, title)
-
-        socket.emit("send-cols", myColumns, table.getSourceData(), title)
+        socket.emit("send-cols", myColumns, title)
     }
 
     const deleteColumn = () => {
         if(myColumns.length <= 2) return
-
-        myRow = table.getSourceData()
-        myRow = myRow.map((item) => {
-            const arr = objectToArray(item, myColumns.length)
-            arr.splice(arr.length - 2, 1)
-            return Object.fromEntries(arr.map((value, index) => [index, value]))
-        })
-        myColumns.pop();
-
-        table.updateSettings({
-            data: myRow,
-            columns: myColumns
-        })
-
-        socket.emit("send-cols", myColumns, table.getSourceData())
+        myColumns.pop()
+        socket.emit("send-cols", myColumns)
     }
 
     useEffect(() => {
@@ -400,7 +367,7 @@ const Tables = () => {
             }
         })
             .then(() => {
-                socket.emit("send-tables")
+                socket.emit("send-tables", tableId)
                 window.location.pathname = `/room/${roomId}/table/${room.main_table}`
             })
     }
@@ -412,23 +379,9 @@ const Tables = () => {
             }
         })
             .then(() => {
-                socket.emit("delete-room")
                 window.location.pathname = `/`
             })
     }
-
-    useEffect(() => {
-        if (socket == null || table == null) return
-
-        const handler = () => {
-            window.location.pathname = `/`
-        }
-        socket.on("go-home", handler)
-
-        return () => {
-            socket.off("go-home", handler)
-        }
-    }, [socket, table])
 
     useEffect(() => {
         if (socket == null || table == null) return
@@ -444,17 +397,18 @@ const Tables = () => {
     }, [socket, table])
 
     useEffect(() => {
-        if (socket == null || table == null) return
+        if (socket == null || table == null || room == null) return
 
-        const handler = () => {
+        const handler = (tableId) => {
             setUpdateTables(prev => !prev)
+            if (tableId !== undefined) window.location.pathname = `/room/${roomId}/table/${room.main_table}`
         }
         socket.on("receive-tables", handler)
 
         return () => {
             socket.off("receive-tables", handler)
         }
-    }, [socket, table])
+    }, [socket, table, room])
 
     const renameTable = async () => {
         const name = document.getElementById('1').value
