@@ -37,6 +37,13 @@ const findCell = (col, row) => {
 
     return filteredElements[0]
 }
+function objectToArray(obj, length) {
+    const arr = new Array(length).fill('');
+    for (const key in obj) {
+        arr[parseInt(key)] = obj[key];
+    }
+    return arr;
+}
 
 const Tables = () => {
     const { roomId, tableId } = useParams()
@@ -287,6 +294,37 @@ const Tables = () => {
         socket.emit("send-cols", myColumns, title)
     }
 
+    const addColumnWithTranslate = async () => {
+
+        myRow = table.getSourceData()
+        myRow = myRow.map((item) => {
+            const arr = objectToArray(item, myColumns.length)
+            arr.splice(arr.length - 1, 0, "")
+            return Object.fromEntries(arr.map((value, index) => [index, value]))
+        })
+        var i;
+        var textForTranslate = []
+        for (i = 0; i < myRow.length; i++) {
+            textForTranslate.push(myRow[i][4])
+
+        }
+
+        const roomResponse = await axios.post(`http://158.160.147.53:6868/translate/translate`, {sourceLanguageCode: "de", folderId: "b1gbi9p05hufm79d5rlo", texts: textForTranslate, targetLanguageCode: document.getElementById("selectlanguage").options[ document.getElementById("selectlanguage").selectedIndex ].value}, {
+            headers: {
+                "Authorization": "Bearer t1.9euelZqWx8ablp7HlJ6Xy5yXnpuLze3rnpWax56dm4zJy8jHmIvGy87Ki5vl9PdqKhVM-e9dKjiV3fT3KlkSTPnvXSo4lc3n9euelZrOjZOVlZzHnsjGlZaejcjMyu_8xeuelZrOjZOVlZzHnsjGlZaejcjMyg.eBRXiNZiaYbPYY5NHsqmmkDVac15GZF0rcNZZg3Zwzqvuein4foe0ba9OivbfkLAtrS32fVwNJA8YZP0kJsyBQ"
+            }
+
+        })
+        console.log(roomResponse.data.message.translations)
+        let translator = roomResponse.data.message.translations.map(item => item.text);
+
+        console.log(translator);
+
+        myColumns.push({})
+
+
+    }
+
     const deleteColumn = () => {
         if(myColumns.length <= 2) return
         myColumns.pop()
@@ -513,21 +551,26 @@ const Tables = () => {
         <>
             <h1>Room name: {room == null ? "" : room.name}</h1>
             <h3>Table name: {tableName}</h3>
-            <button onClick={deleteRoom}>Delete Room</button><br/>
+            <button onClick={deleteRoom}>Delete Room</button>
+            <br/>
             <div className="container" ref={wrapperRef}/>
             <button onClick={addRow}>Add Row</button>
             <button onClick={addColumn}>Add Column</button>
             <input type={'text'} id={'999999999'}/>
             <button onClick={deleteColumn}>Delete Column</button>
-            <button onClick={deleteRow}>Delete Row</button><br/>
+            <button onClick={deleteRow}>Delete Row</button>
+            <br/>
             <button onClick={addTable}>Add Table</button>
             <input type={'text'} id={'333'}/>
-            <button onClick={deleteTable}>Delete Table</button><br/>
+            <button onClick={deleteTable}>Delete Table</button>
+            <br/>
+            <h1>Список таюлиц комнаты</h1>
             <ul>
                 {allTables != null ? allTables.map((item) => (
                     <li key={item.id}><a href={item.id}>{item.name}</a></li>
-                        )) : ""}
-            </ul><br/>
+                )) : ""}
+            </ul>
+            <br/>
             <button onClick={renameTable}>Rename Table</button>
             <input type={'text'} id={'1'}/><br/>
             <button onClick={renameRoom}>Rename Room</button>
@@ -536,11 +579,21 @@ const Tables = () => {
                 {users != null ? users.map((item) => (
                     <li key={item._id}>{item.username}</li>
                 )) : ""}
-            </ul><br/>
+            </ul>
+            <br/>
             <button onClick={addUser}>Add User</button>
             <input type={'text'} id={'123456789'}/><br/>
             <button onClick={deleteUser}>Delete User</button>
             <input type={'text'} id={'987654321'}/><br/>
+            <div>Выберите язык для перевода</div>
+            <select id="selectlanguage">
+                <option value="en" label="Английский"></option>
+                <option value="ru" label="Русский"></option>
+                <option value="de" label="Немецкий"></option>
+                <option value="es" label="Испанский"></option>
+            </select>
+            <button onClick={addColumnWithTranslate}>Добавить перевод на выбранный язык</button>
+
         </>
     )
 }
