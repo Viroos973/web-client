@@ -37,13 +37,6 @@ const findCell = (col, row) => {
 
     return filteredElements[0]
 }
-function objectToArray(obj, length) {
-    const arr = new Array(length).fill('');
-    for (const key in obj) {
-        arr[parseInt(key)] = obj[key];
-    }
-    return arr;
-}
 
 const Tables = () => {
     const { roomId, tableId } = useParams()
@@ -295,34 +288,12 @@ const Tables = () => {
     }
 
     const addColumnWithTranslate = async () => {
-
-        myRow = table.getSourceData()
-        myRow = myRow.map((item) => {
-            const arr = objectToArray(item, myColumns.length)
-            arr.splice(arr.length - 1, 0, "")
-            return Object.fromEntries(arr.map((value, index) => [index, value]))
-        })
-        var i;
-        var textForTranslate = []
-        for (i = 0; i < myRow.length; i++) {
-            textForTranslate.push(myRow[i][4])
-
-        }
-
-        const roomResponse = await axios.post(`http://158.160.147.53:6868/translate/translate`, {sourceLanguageCode: "de", folderId: "b1gbi9p05hufm79d5rlo", texts: textForTranslate, targetLanguageCode: document.getElementById("selectlanguage").options[ document.getElementById("selectlanguage").selectedIndex ].value}, {
-            headers: {
-                "Authorization": "Bearer t1.9euelZqWx8ablp7HlJ6Xy5yXnpuLze3rnpWax56dm4zJy8jHmIvGy87Ki5vl9PdqKhVM-e9dKjiV3fT3KlkSTPnvXSo4lc3n9euelZrOjZOVlZzHnsjGlZaejcjMyu_8xeuelZrOjZOVlZzHnsjGlZaejcjMyg.eBRXiNZiaYbPYY5NHsqmmkDVac15GZF0rcNZZg3Zwzqvuein4foe0ba9OivbfkLAtrS32fVwNJA8YZP0kJsyBQ"
-            }
-
-        })
-        console.log(roomResponse.data.message.translations)
-        let translator = roomResponse.data.message.translations.map(item => item.text);
-
-        console.log(translator);
-
-        myColumns.push({})
-
-
+        const language = document.getElementById("selectlanguage")
+            .options[document.getElementById("selectlanguage").selectedIndex].value
+        const translationCol = table.getActiveEditor().col
+        const title = table.getSourceData()[0][translationCol] + "_Translation"
+        myColumns.push({});
+        socket.emit("send-cols", myColumns, title, translationCol, language)
     }
 
     const deleteColumn = () => {
@@ -588,12 +559,11 @@ const Tables = () => {
             <div>Выберите язык для перевода</div>
             <select id="selectlanguage">
                 <option value="en" label="Английский"></option>
-                <option value="ru" label="Русский"></option>
+                <option value="fr" label="Французский"></option>
                 <option value="de" label="Немецкий"></option>
                 <option value="es" label="Испанский"></option>
             </select>
             <button onClick={addColumnWithTranslate}>Добавить перевод на выбранный язык</button>
-
         </>
     )
 }
