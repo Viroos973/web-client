@@ -12,6 +12,7 @@
   "dependencies": {
     "@datagridxl/datagridxl2": "^2.0.21",
     "axios": "^1.7.2",
+    "google-translate-api": "^2.3.0",
     "handsontable": "^14.4.0",
     "quill": "^2.0.2",
     "quill-better-table": "^1.2.10",
