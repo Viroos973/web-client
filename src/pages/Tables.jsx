@@ -548,20 +548,32 @@ const Tables = () => {
         setTable(t)
     }, [])
 
-    const base64encode = () => {
+
+    const toBase64 = file => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+    });
+
+    const base64encode = async () => {
         const fileInput = document.getElementById('88888888')
 
         const file = fileInput.files[0]
-        let formData = new FormData();
-        formData.append("zipWithMsbts", file);
-
-        let reader = new FileReader();
-
-        reader.readAsText(file);
-
-        reader.onload = function() {
-            console.log(Base64.encode(reader.result));
-        };
+        const text = await toBase64(file)
+        console.log(text.split(",")[1])
+        // let formData = new FormData();
+        // formData.append("zipWithMsbts", file);
+        //
+        // let reader = new FileReader();
+        //
+        // reader.readAsText(file);
+        //
+        // reader.onload = function() {
+        //     var uint8 = Uint8Array.from(reader.result.split("").map(x => x.charCodeAt()))
+        //     console.log(Base64.fromUint8Array(uint8));
+        //     console.log(reader.result);
+        // };
         console.log(file)
     }
 
