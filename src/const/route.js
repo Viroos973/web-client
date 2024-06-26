@@ -1,4 +1,4 @@
 export const ROUTES = {
     ROOT: '/',
-    TABLES: '/documents/:id'
+    TABLES: '/room/:roomId/table/:tableId'
 }
