@@ -4,7 +4,7 @@ import {useParams} from "react-router-dom"
 import Handsontable from 'handsontable';
 import 'handsontable/dist/handsontable.full.min.css';
 import axios from "axios";
-
+import {Base64} from 'js-base64';
 let editUser = true
 let myColumns = [
     {
@@ -547,6 +547,26 @@ const Tables = () => {
 
         setTable(t)
     }, [])
+
+    const base64encode = () => {
+        const fileInput = document.getElementById('88888888')
+
+        const file = fileInput.files[0]
+        let formData = new FormData();
+        formData.append("zipWithMsbts", file);
+
+        let reader = new FileReader();
+
+        reader.readAsText(file);
+
+        reader.onload = function() {
+            console.log(Base64.encode(reader.result));
+        };
+        console.log(file)
+    }
+
+
+
     return (
         <>
             <h1>Room name: {room == null ? "" : room.name}</h1>
@@ -593,7 +613,8 @@ const Tables = () => {
                 <option value="es" label="Испанский"></option>
             </select>
             <button onClick={addColumnWithTranslate}>Добавить перевод на выбранный язык</button>
-
+            <input type="file" id="88888888" name="file"/>
+            <button onClick={base64encode}>сделать что-то страшное</button>
         </>
     )
 }
