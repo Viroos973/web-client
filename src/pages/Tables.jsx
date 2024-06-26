@@ -4,7 +4,6 @@ import {useParams} from "react-router-dom"
 import Handsontable from 'handsontable';
 import 'handsontable/dist/handsontable.full.min.css';
 import axios from "axios";
-import {Base64} from 'js-base64';
 let editUser = true
 let myColumns = [
     {
@@ -561,20 +560,48 @@ const Tables = () => {
 
         const file = fileInput.files[0]
         const text = await toBase64(file)
-        console.log(text.split(",")[1])
-        // let formData = new FormData();
-        // formData.append("zipWithMsbts", file);
-        //
-        // let reader = new FileReader();
-        //
-        // reader.readAsText(file);
-        //
-        // reader.onload = function() {
-        //     var uint8 = Uint8Array.from(reader.result.split("").map(x => x.charCodeAt()))
-        //     console.log(Base64.fromUint8Array(uint8));
-        //     console.log(reader.result);
-        // };
-        console.log(file)
+        const result = text.split(",")[1]
+        console.log(result)
+        const filename = "example.msbp";
+        const newfile = base64ToFile(result, filename);
+
+        console.log(newfile); // Вывод объекта File
+        downloadFile(newfile);
+    }
+
+    function downloadFile(file) {
+        // Создание URL для объекта File
+        const url = URL.createObjectURL(file);
+
+        // Создание временного элемента <a>
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name; // Установка имени файла для загрузки
+        document.body.appendChild(a);
+        a.click(); // Инициирование загрузки
+        document.body.removeChild(a); // Удаление элемента после загрузки
+        URL.revokeObjectURL(url); // Освобождение памяти
+    }
+
+    function base64ToFile(base64String, filename) {
+        // Удаление префикса, если он есть (например, data:image/png;base64,)
+        const base64WithoutPrefix = base64String;
+
+        // Преобразование строки Base64 в бинарные данные
+        const binaryString = atob(base64WithoutPrefix);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+
+        // Создание Blob из бинарных данных
+        const blob = new Blob([bytes], { type: 'application/octet-stream' });
+
+        // Создание объекта File из Blob (опционально)
+        const file = new File([blob], filename, { type: blob.type });
+
+        return file;
     }
 
 
